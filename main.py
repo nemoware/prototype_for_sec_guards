@@ -57,4 +57,5 @@ uploader = st.sidebar.file_uploader("Выберите файл", ["doc", "docx"]
 if uploader and st.sidebar.button('Получить результат'):
     with st.spinner(text="Обработка документа"), open(etalon_file_name, "rb") as etalon_file:
         from_parser = get_json_from_parser(uploader.getvalue(), uploader.name)[0]["paragraphs"]
+        # st.write(from_parser)
         analysis.analysis(from_parser)
