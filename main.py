@@ -52,6 +52,13 @@ def get_json_from_parser(doc, filename):
 
 
 st.set_page_config(layout="wide")
+
+st.markdown(f'''
+    <style>
+        header[data-testid="stHeader"] {{left:98%;}}
+    </style>
+''', unsafe_allow_html=True)
+
 uploader = st.sidebar.file_uploader("Выберите файл", ["doc", "docx"])
 
 if uploader and st.sidebar.button('Получить результат'):

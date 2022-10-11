@@ -17,6 +17,7 @@ def analysis(paragraphs) -> None:
     is_there_confidentiality: bool = False
     is_there_main_header: bool = False
     is_there_main_header2: bool = False
+    is_main_header: bool = False
     list_of_sub_paragraphs = []
     list_of_links = []
 
@@ -38,6 +39,7 @@ def analysis(paragraphs) -> None:
         if paragraph_header.find(ideal_json['security']['MainHeader']) != -1:
             is_there_main_header = True
             is_there_main_header2 = True
+            is_main_header = True
 
         if is_there_main_header:
             ideal_paragraphs = ideal_json['security']['paragraphs']
@@ -50,11 +52,22 @@ def analysis(paragraphs) -> None:
                                        list_of_links)
                 if flag:
                     list_of_sub_paragraphs.append(ideal_paragraph['id'])
-                    continue
+                    break
 
-            if not flag:
-                is_there_main_header = False
+            if not flag and not is_main_header:
+                # is_there_main_header = False
+                print('123')
+            elif not flag and is_main_header:
+                list_of_links.append({
+                    "text": paragraph_header,
+                    "link": re.sub(r'\s', '', paragraph_header[:15])
+                })
+                st.header(paragraph_header, anchor=re.sub(r'\s', '', paragraph_header[:15]))
+                st.write(paragraph_text)
+                is_main_header = False
+                continue
             else:
+                is_main_header = False
                 continue
         list_of_links.append({
             "text": paragraph_header,
@@ -72,16 +85,17 @@ def analysis(paragraphs) -> None:
         ideal_paragraphs = ideal_json['security']['paragraphs']
         for ideal_paragraph in ideal_paragraphs:
             index = ideal_paragraph['id']
+            if ideal_paragraph['id'] not in list_of_sub_paragraphs:
+                st.sidebar.error(f"Не найден заголовок {ideal_paragraph['header']}")
+                continue
             if index_exists(list_of_sub_paragraphs, index):
                 if list_of_sub_paragraphs[index] != index:
                     st.sidebar.error(f'{ideal_paragraph["header"]} не на своем месте')
 
-            if ideal_paragraph['id'] not in list_of_sub_paragraphs:
-                st.sidebar.error(f"Не найден заголовок {ideal_paragraph['header']}")
-
     for link in list_of_links:
-        print(f'[{link["text"]}](#{link["link"]})')
-        st.sidebar.markdown(f'[{link["text"]}](#{link["link"]})')
+        # print(f'[{link["text"]}](#{link["link"]})')
+        link_text = link['text'].replace('\n', '').replace('\r', '')
+        st.sidebar.markdown(f'[{link_text}](#{link["link"]})')
 
 
 def confidentiality(correct_header: str, correct_text: str, header: str, text: str, list_of_link: []) -> bool:
