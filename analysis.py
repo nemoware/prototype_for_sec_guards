@@ -93,7 +93,6 @@ def analysis(paragraphs) -> None:
                     st.sidebar.error(f'{ideal_paragraph["header"]} не на своем месте')
 
     for link in list_of_links:
-        # print(f'[{link["text"]}](#{link["link"]})')
         link_text = link['text'].replace('\n', '').replace('\r', '')
         st.sidebar.markdown(f'[{link_text}](#{link["link"]})')
 
