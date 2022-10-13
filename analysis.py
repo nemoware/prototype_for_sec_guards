@@ -66,7 +66,8 @@ def analysis(paragraphs) -> None:
                 if paragraph_text:
                     st.write(paragraph_text)
                     obj['messages'].append('Неизвестный текст')
-                list_of_links.append(obj)
+                write(paragraph_header, obj['messages'], True, obj['link'])
+                # list_of_links.append(obj)
                 is_main_header = False
                 continue
 
@@ -118,18 +119,13 @@ def analysis(paragraphs) -> None:
         if is_it_scum:
             if not link.get('unknown', False):
                 is_it_scum = False
+                list_of_links2.append(link)
         else:
             list_of_links2.append(link)
     list_of_links2.reverse()
 
     for link in list_of_links2:
         link_text = link['text'].replace('\n', '').replace('\r', '')
-        # if link['link'] is None:
-        #     st.sidebar.write(link_text)
-        # else:
-        #     st.sidebar.markdown(f'[{link_text}](#{link["link"]})')
-        # for message in link['messages']:
-        #     st.sidebar.error(message)
         write(link_text, link['messages'], True if link['link'] is not None else False, link['link'])
 
 
@@ -208,29 +204,41 @@ def index_exists(list_of, index):
 
 
 def write(text, messages, is_link=False, link=None):
+    link_text = text.replace('\n', '').replace('\r', '')
+    link_text = re.sub(r"[\d\.]{1,4}", "", link_text)
     if is_link:
-        link_text = text.replace('\n', '').replace('\r', '')
         st.sidebar.markdown(f'[{link_text}](#{link})')
     else:
         st.sidebar.write(text)
     result_str = '<div style="display: flex;gap: 10px;">'
     for msg in messages:
-        result_str += get_style('green', msg)
+        result_str += get_style(msg)
     result_str += '</div>'
     st.sidebar.markdown(result_str, unsafe_allow_html=True)
 
 
-def get_style(color: str, text: str, ):
+def get_style(text: str):
     grey_color = '#808080'
-    orange_color = '#9F6000'
+    orange_color = 'rgb(248, 203, 172)'
     green_color = 'lawngreen'
-    current_color = ''
-    if color == 'green':
+    red_color = 'rgb(254, 204, 203)'
+    yellow_color = 'rgb(255, 230, 153)'
+    current_color = '#808080'
+
+    if text == 'Найден, ошибок нет':
         current_color = green_color
-    if color == 'orange':
-        current_color = orange_color
-    if color == 'grey':
+
+    if text == 'Неправильный порядок':
+        current_color = yellow_color
+
+    if text == 'Неизвестный пункт':
         current_color = grey_color
+
+    if text == 'Не найден пункт':
+        current_color = red_color
+
+    if text == 'Ошибки':
+        current_color = orange_color
 
     return f'''
     <span style="text-size-adjust: 100%;
@@ -243,10 +251,10 @@ def get_style(color: str, text: str, ):
     line-height: 1.6;
     pointer-events: auto;
     height: auto;
-    padding-top: 16px;
-    padding-right: 16px;
-    padding-bottom: 16px;
-    padding-left: 16px;
+    padding-top: 8px;
+    padding-right: 8px;
+    padding-bottom: 8px;
+    padding-left: 8px;
     margin-top: 0px;
     margin-bottom: 0px;
     border-top-left-radius: 0.25rem;

@@ -1,10 +1,6 @@
-import logging
-import re
-import time
-from json import JSONDecodeError
-import copy
 import base64
 import json
+
 import requests
 import streamlit as st
 
@@ -56,6 +52,12 @@ st.set_page_config(layout="wide")
 st.markdown(f'''
     <style>
         header[data-testid="stHeader"] {{left:98%;}}
+    </style>
+''', unsafe_allow_html=True)
+
+st.markdown(f'''
+    <style>
+        div[data-testid="stMarkdownContainer"] > p {{margin-bottom: 5px;}}
     </style>
 ''', unsafe_allow_html=True)
 
