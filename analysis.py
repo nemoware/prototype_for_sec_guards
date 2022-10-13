@@ -1,9 +1,8 @@
+import difflib
+import json
 import re
 
 import streamlit as st
-import json
-import difflib
-
 from nltk import WhitespaceTokenizer
 
 
@@ -18,6 +17,7 @@ def analysis(paragraphs) -> None:
     is_there_main_header: bool = False
     is_there_main_header2: bool = False
     is_main_header: bool = False
+
     list_of_sub_paragraphs = []
     list_of_links = []
 
@@ -31,7 +31,8 @@ def analysis(paragraphs) -> None:
                 confidentiality_text,
                 paragraph['paragraphHeader']['text'],
                 paragraph_text,
-                list_of_links
+                list_of_links,
+                -20
             )
             if is_there_confidentiality:
                 continue
@@ -49,55 +50,91 @@ def analysis(paragraphs) -> None:
                                        ideal_paragraph['text'],
                                        paragraph_header,
                                        paragraph_text,
-                                       list_of_links)
+                                       list_of_links,
+                                       ideal_paragraph['id'])
                 if flag:
                     list_of_sub_paragraphs.append(ideal_paragraph['id'])
                     break
 
-            if not flag and not is_main_header:
-                # is_there_main_header = False
-                print('123')
-            elif not flag and is_main_header:
+            if not flag and is_main_header:
+                obj = {
+                    "text": paragraph_header,
+                    "link": re.sub(r'\s', '', paragraph_header[:15]),
+                    "messages": []
+                }
+                st.header(paragraph_header, anchor=re.sub(r'\s', '', paragraph_header[:15]))
+                if paragraph_text:
+                    st.write(paragraph_text)
+                    obj['messages'].append('Неизвестный текст')
+                list_of_links.append(obj)
+                is_main_header = False
+                continue
+
+            if flag:
+                is_main_header = False
+                continue
+
+            if not flag:
                 list_of_links.append({
                     "text": paragraph_header,
-                    "link": re.sub(r'\s', '', paragraph_header[:15])
+                    "link": re.sub(r'\s', '', paragraph_header[:15]),
+                    "messages": ["Неизвестный пункт"],
+                    "unknown": True
                 })
                 st.header(paragraph_header, anchor=re.sub(r'\s', '', paragraph_header[:15]))
                 st.write(paragraph_text)
-                is_main_header = False
                 continue
-            else:
-                is_main_header = False
-                continue
-        list_of_links.append({
-            "text": paragraph_header,
-            "link": re.sub(r'\s', '', paragraph_header[:15])
-        })
         st.header(paragraph_header, anchor=re.sub(r'\s', '', paragraph_header[:15]))
         st.write(paragraph_text)
 
     if not is_there_confidentiality:
-        st.sidebar.error(f'Заголовок "{confidentiality_header}" не найден')
+        write(confidentiality_header, ['Не найден пункт'])
 
     if not is_there_main_header2:
-        st.sidebar.error(f'Заголовок "Требования к безопасности" не был найден')
+        main_header = ideal_json['security']['MainHeader']
+        write(main_header, ['Не найден пункт'])
     else:
         ideal_paragraphs = ideal_json['security']['paragraphs']
         for ideal_paragraph in ideal_paragraphs:
             index = ideal_paragraph['id']
-            if ideal_paragraph['id'] not in list_of_sub_paragraphs:
-                st.sidebar.error(f"Не найден заголовок {ideal_paragraph['header']}")
+            if index not in list_of_sub_paragraphs:
+                list_of_links.insert(index, {
+                    "text": ideal_paragraph['header'],
+                    "link": None,
+                    "messages": ["Не найден пункт"]
+                })
                 continue
+
+            obj = next(item for item in list_of_links if item.get('id', -1) == index)
             if index_exists(list_of_sub_paragraphs, index):
                 if list_of_sub_paragraphs[index] != index:
-                    st.sidebar.error(f'{ideal_paragraph["header"]} не на своем месте')
+                    obj['messages'].append("Неправильный порядок")
+            else:
+                obj['messages'].append("Неправильный порядок")
 
-    for link in list_of_links:
+    list_of_links2 = []
+    is_it_scum = True
+    for link in reversed(list_of_links):
+        if is_it_scum:
+            if not link.get('unknown', False):
+                is_it_scum = False
+        else:
+            list_of_links2.append(link)
+    list_of_links2.reverse()
+
+    for link in list_of_links2:
         link_text = link['text'].replace('\n', '').replace('\r', '')
-        st.sidebar.markdown(f'[{link_text}](#{link["link"]})')
+        # if link['link'] is None:
+        #     st.sidebar.write(link_text)
+        # else:
+        #     st.sidebar.markdown(f'[{link_text}](#{link["link"]})')
+        # for message in link['messages']:
+        #     st.sidebar.error(message)
+        write(link_text, link['messages'], True if link['link'] is not None else False, link['link'])
 
 
-def confidentiality(correct_header: str, correct_text: str, header: str, text: str, list_of_link: []) -> bool:
+def confidentiality(correct_header: str, correct_text: str, header: str, text: str, list_of_link: [],
+                    paragraph_id=None) -> bool:
     if header.find(correct_header) != -1:
         spans_ideal = WhitespaceTokenizer().tokenize(text)
         spans = WhitespaceTokenizer().tokenize(correct_text)
@@ -139,13 +176,21 @@ def confidentiality(correct_header: str, correct_text: str, header: str, text: s
             re_compile = re.compile(line2)
             text = re_compile.sub(line, text)
 
-        if are_there_errors:
-            st.sidebar.error(f"Есть ошибки в {header}")
-
-        list_of_link.append({
+        obj = {
+            "id": paragraph_id,
             "text": header,
-            "link": re.sub(r'\s', '', header[:15])
-        })
+            "link": re.sub(r'\s', '', header[:15]),
+            "messages": []
+        }
+
+        if are_there_errors:
+            obj['messages'].append('Ошибки')
+        else:
+            obj['messages'].append("Найден, ошибок нет")
+        if paragraph_id == -20:
+            write(header, obj['messages'], True, re.sub(r'\s', '', header[:15]))
+        else:
+            list_of_link.append(obj)
         st.header(header, re.sub(r'\s', '', header[:15]))
         st.markdown(text, unsafe_allow_html=True)
 
@@ -160,3 +205,61 @@ def index_exists(list_of, index):
         return True
     except IndexError:
         return False
+
+
+def write(text, messages, is_link=False, link=None):
+    if is_link:
+        link_text = text.replace('\n', '').replace('\r', '')
+        st.sidebar.markdown(f'[{link_text}](#{link})')
+    else:
+        st.sidebar.write(text)
+    result_str = '<div style="display: flex;gap: 10px;">'
+    for msg in messages:
+        result_str += get_style('green', msg)
+    result_str += '</div>'
+    st.sidebar.markdown(result_str, unsafe_allow_html=True)
+
+
+def get_style(color: str, text: str, ):
+    grey_color = '#808080'
+    orange_color = '#9F6000'
+    green_color = 'lawngreen'
+    current_color = ''
+    if color == 'green':
+        current_color = green_color
+    if color == 'orange':
+        current_color = orange_color
+    if color == 'grey':
+        current_color = grey_color
+
+    return f'''
+    <span style="text-size-adjust: 100%;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    -webkit-font-smoothing: auto;
+    user-select: auto;
+    box-sizing: border-box;
+    font-size: 1rem;
+    font-weight: normal;
+    line-height: 1.6;
+    pointer-events: auto;
+    height: auto;
+    padding-top: 16px;
+    padding-right: 16px;
+    padding-bottom: 16px;
+    padding-left: 16px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    border-top-left-radius: 0.25rem;
+    border-top-right-radius: 0.25rem;
+    border-bottom-right-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
+    box-shadow: none;
+    transition-property: all;
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    -webkit-box-pack: justify;
+    justify-content: space-between;
+    border: 0px;
+    opacity: 1;
+    background-color: {current_color};">{text}</span>'''
