@@ -37,7 +37,7 @@ def analysis(paragraphs) -> None:
             if is_there_confidentiality:
                 continue
 
-        if paragraph_header.find(ideal_json['security']['MainHeader']) != -1:
+        if paragraph_header.find(ideal_json['security']['MainHeader']) != -1 and is_there_main_header is False:
             is_there_main_header = True
             is_there_main_header2 = True
             is_main_header = True
@@ -132,6 +132,13 @@ def analysis(paragraphs) -> None:
 def confidentiality(correct_header: str, correct_text: str, header: str, text: str, list_of_link: [],
                     paragraph_id=None) -> bool:
     if header.find(correct_header) != -1:
+        list_of_symbol = ['[', '$', '&',
+                          '+', ':', ';',
+                          '=', '?', '@',
+                          '#', '|', '<',
+                          '>', '.', '^',
+                          '*', '(', ')',
+                          '%', '!', '-', ']']
         spans_ideal = WhitespaceTokenizer().tokenize(text)
         spans = WhitespaceTokenizer().tokenize(correct_text)
         i = -1
@@ -167,7 +174,10 @@ def confidentiality(correct_header: str, correct_text: str, header: str, text: s
             list_of_bad_lines[i] += line
 
         for index, line in enumerate(list_of_good_lines):
-            line2 = list_of_bad_lines[index].strip().replace('.', '\\.')
+            line2 = list_of_bad_lines[index].strip()
+            for symbol in list_of_symbol:
+                line2 = line2.replace(symbol, f'\\{symbol}')
+
             line2 = re.sub(r'\s+', '\\\s+', line2)
             re_compile = re.compile(line2)
             text = re_compile.sub(line, text)
