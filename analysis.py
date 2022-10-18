@@ -2,14 +2,26 @@ import difflib
 import json
 import re
 
+import numpy as np
 import streamlit as st
+import tensorflow_hub as hub
+import tensorflow_text as text
 from nltk import WhitespaceTokenizer
 
 
-def analysis(paragraphs) -> None:
-    ideal_json = open('./ideal.json', encoding='utf-8')
-    ideal_json = json.load(ideal_json)
+with open('./ideal.json', encoding='utf-8') as f:
+    ideal_json = json.load(f)
+    embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-multilingual-large/3")
 
+
+def calculate_similarity(correct_text: str, text: str):
+    normalized_header = re.sub(r'^[\d,.]+', '', text)
+    embeddings = embed([correct_text, normalized_header])
+    similarity = np.inner(embeddings, embeddings)[0][1]
+    return similarity
+
+
+def analysis(paragraphs) -> None:
     confidentiality_header = ideal_json['confidentiality']['header']
     confidentiality_text = ideal_json['confidentiality']['text']
 
@@ -37,12 +49,14 @@ def analysis(paragraphs) -> None:
             if is_there_confidentiality:
                 continue
 
-        if paragraph_header.find(ideal_json['security']['MainHeader']) != -1:
+        if calculate_similarity(ideal_json['security']['MainHeader'], paragraph_header) > 0.8:
+        # if paragraph_header.find(ideal_json['security']['MainHeader']) != -1:
             is_there_main_header = True
             is_there_main_header2 = True
             is_main_header = True
 
-        if is_there_main_header:
+        # if is_there_main_header:
+        if True:
             ideal_paragraphs = ideal_json['security']['paragraphs']
             flag = False
             for ideal_paragraph in ideal_paragraphs:
@@ -131,7 +145,8 @@ def analysis(paragraphs) -> None:
 
 def confidentiality(correct_header: str, correct_text: str, header: str, text: str, list_of_link: [],
                     paragraph_id=None) -> bool:
-    if header.find(correct_header) != -1:
+    if calculate_similarity(correct_header, header) > 0.7:
+    # if header.find(correct_header) != -1:
         spans_ideal = WhitespaceTokenizer().tokenize(text)
         spans = WhitespaceTokenizer().tokenize(correct_text)
         i = -1

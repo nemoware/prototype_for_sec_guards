@@ -1,3 +1,4 @@
 nltk==3.7
 streamlit==1.13.0
-
+tensorflow==2.9.1
+tensorflow_text==2.9.0
