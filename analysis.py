@@ -133,6 +133,7 @@ def analysis(paragraphs) -> None:
                     "link": None,
                     "messages": ["Не найден пункт"]
                 })
+                list_of_sub_paragraphs.insert(index, index)
                 continue
 
             obj = next(item for item in list_of_links if item.get('id', -1) == index)
@@ -191,13 +192,14 @@ def confidentiality(etalon: dict, header: str, text: str, list_of_link: [],
             if line.startswith('-'):
                 are_there_errors = True
                 list_of_good_lines[
-                    i] += f'<span style="background-color:lawngreen;display: inline;"> {line[1:]} </span>'
+                    i] += f'<span style="background-color:rgb(141, 255, 135);display: inline;"> {line[1:]} </span>'
                 continue
 
             if line.startswith('+'):
                 are_there_errors = True
                 list_of_bad_lines[i] += ' ' + line[1:]
-                list_of_good_lines[i] += f'<span style="background-color:red;display: inline;"> {line[1:]} </span>'
+                list_of_good_lines[
+                    i] += f'<span style="background-color:rgb(254, 204, 203);display: inline;"> {line[1:]} </span>'
                 continue
 
             list_of_good_lines[i] += line
@@ -258,12 +260,13 @@ def write(text, messages, is_link=False, link=None):
 
 
 def get_style(text: str):
-    grey_color = '#808080'
+    grey_color = 'rgb(173, 173, 173)'
     orange_color = 'rgb(248, 203, 172)'
-    green_color = 'lawngreen'
+    green_color = 'rgb(141, 255, 135)'
     red_color = 'rgb(254, 204, 203)'
     yellow_color = 'rgb(255, 230, 153)'
-    current_color = '#808080'
+    purple_color = 'rgb(224, 163, 255)'
+    current_color = 'rgb(161, 161, 161)'
 
     if text == 'Найден, ошибок нет':
         current_color = green_color
@@ -273,6 +276,9 @@ def get_style(text: str):
 
     if text == 'Неизвестный пункт':
         current_color = grey_color
+
+    if text == 'Неизвестный текст':
+        current_color = purple_color
 
     if text == 'Не найден пункт':
         current_color = red_color
@@ -291,10 +297,7 @@ def get_style(text: str):
     line-height: 1.6;
     pointer-events: auto;
     height: auto;
-    padding-top: 8px;
-    padding-right: 8px;
-    padding-bottom: 8px;
-    padding-left: 8px;
+    padding: 5px;
     margin-top: 0px;
     margin-bottom: 0px;
     border-top-left-radius: 0.25rem;
