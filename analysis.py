@@ -8,16 +8,31 @@ import tensorflow_hub as hub
 import tensorflow_text as text
 from nltk import WhitespaceTokenizer
 
-
 with open('./ideal.json', encoding='utf-8') as f:
     ideal_json = json.load(f)
     embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-multilingual-large/3")
 
 
-def calculate_similarity(correct_text: str, text: str):
+def get_clean_spans(text: str) -> [str]:
+    spans = WhitespaceTokenizer().tokenize(text)
+    clean_spans = []
+    for span in spans:
+        if len(span) > 2:
+            clean_spans.append(span)
+    return clean_spans
+
+
+def calculate_similarity(keywords: [str], text: str):
     normalized_header = re.sub(r'^[\d,.]+', '', text)
-    embeddings = embed([correct_text, normalized_header])
-    similarity = np.inner(embeddings, embeddings)[0][1]
+    clean_spans = get_clean_spans(normalized_header)
+    if len(clean_spans) > 7:  # в эталоне только короткие заголовки
+        return 0
+    correct_embeddings = embed(keywords)
+    embeddings = embed(clean_spans)
+    sim_mat = np.inner(correct_embeddings, embeddings).flatten()
+    top = min(len(keywords), 2)
+    indexes = np.argpartition(sim_mat, -top)[-top:]
+    similarity = sum(sim_mat[indexes]) / top
     return similarity
 
 
@@ -29,6 +44,7 @@ def analysis(paragraphs) -> None:
     is_there_main_header: bool = False
     is_there_main_header2: bool = False
     is_main_header: bool = False
+    main_headers = 0
 
     list_of_sub_paragraphs = []
     list_of_links = []
@@ -39,8 +55,7 @@ def analysis(paragraphs) -> None:
 
         if not is_there_confidentiality:
             is_there_confidentiality = confidentiality(
-                confidentiality_header,
-                confidentiality_text,
+                ideal_json['confidentiality'],
                 paragraph['paragraphHeader']['text'],
                 paragraph_text,
                 list_of_links,
@@ -49,19 +64,18 @@ def analysis(paragraphs) -> None:
             if is_there_confidentiality:
                 continue
 
-        if calculate_similarity(ideal_json['security']['MainHeader'], paragraph_header) > 0.8:
+        if calculate_similarity(ideal_json['security']['keywords'], paragraph_header) > 0.9:
         # if paragraph_header.find(ideal_json['security']['MainHeader']) != -1:
             is_there_main_header = True
             is_there_main_header2 = True
             is_main_header = True
 
-        # if is_there_main_header:
-        if True:
+        if is_there_main_header:
+            # if True:
             ideal_paragraphs = ideal_json['security']['paragraphs']
             flag = False
             for ideal_paragraph in ideal_paragraphs:
-                flag = confidentiality(ideal_paragraph['header'],
-                                       ideal_paragraph['text'],
+                flag = confidentiality(ideal_paragraph,
                                        paragraph_header,
                                        paragraph_text,
                                        list_of_links,
@@ -71,17 +85,18 @@ def analysis(paragraphs) -> None:
                     break
 
             if not flag and is_main_header:
-                obj = {
-                    "text": paragraph_header,
-                    "link": re.sub(r'\s', '', paragraph_header[:15]),
-                    "messages": []
-                }
-                st.header(paragraph_header, anchor=re.sub(r'\s', '', paragraph_header[:15]))
-                if paragraph_text:
-                    st.write(paragraph_text)
-                    obj['messages'].append('Неизвестный текст')
-                write(paragraph_header, obj['messages'], True, obj['link'])
-                # list_of_links.append(obj)
+                if main_headers == 0:
+                    obj = {
+                        "text": paragraph_header,
+                        "link": re.sub(r'\s', '', paragraph_header[:15]),
+                        "messages": []
+                    }
+                    st.header(paragraph_header, anchor=re.sub(r'\s', '', paragraph_header[:15]))
+                    if paragraph_text:
+                        st.write(paragraph_text)
+                        obj['messages'].append('Неизвестный текст')
+                    write(paragraph_header, obj['messages'], True, obj['link'])
+                    main_headers += 1
                 is_main_header = False
                 continue
 
@@ -143,12 +158,19 @@ def analysis(paragraphs) -> None:
         write(link_text, link['messages'], True if link['link'] is not None else False, link['link'])
 
 
-def confidentiality(correct_header: str, correct_text: str, header: str, text: str, list_of_link: [],
+def confidentiality(etalon: dict, header: str, text: str, list_of_link: [],
                     paragraph_id=None) -> bool:
-    if calculate_similarity(correct_header, header) > 0.7:
-    # if header.find(correct_header) != -1:
+    if calculate_similarity(etalon['keywords'], header) > 0.85:
+        # if header.find(correct_header) != -1:
+        list_of_symbol = ['[', '$', '&',
+                          '+', ':', ';',
+                          '=', '?', '@',
+                          '#', '|', '<',
+                          '>', '.', '^',
+                          '*', '(', ')',
+                          '%', '!', '-', ']']
         spans_ideal = WhitespaceTokenizer().tokenize(text)
-        spans = WhitespaceTokenizer().tokenize(correct_text)
+        spans = WhitespaceTokenizer().tokenize(etalon['text'])
         i = -1
         list_of_bad_lines: [str] = []
         list_of_good_lines: [str] = []
@@ -182,7 +204,10 @@ def confidentiality(correct_header: str, correct_text: str, header: str, text: s
             list_of_bad_lines[i] += line
 
         for index, line in enumerate(list_of_good_lines):
-            line2 = list_of_bad_lines[index].strip().replace('.', '\\.')
+            line2 = list_of_bad_lines[index].strip()
+            for symbol in list_of_symbol:
+                line2 = line2.replace(symbol, f'\\{symbol}')
+
             line2 = re.sub(r'\s+', '\\\s+', line2)
             re_compile = re.compile(line2)
             text = re_compile.sub(line, text)
