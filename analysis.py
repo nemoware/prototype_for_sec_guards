@@ -44,7 +44,7 @@ def analysis(paragraphs) -> None:
     is_there_main_header: bool = False
     is_there_main_header2: bool = False
     is_main_header: bool = False
-    main_headers = 0
+    # main_headers = 0
 
     list_of_sub_paragraphs = []
     list_of_links = []
@@ -64,14 +64,14 @@ def analysis(paragraphs) -> None:
             if is_there_confidentiality:
                 continue
 
-        if calculate_similarity(ideal_json['security']['keywords'], paragraph_header) > 0.9:
-        # if paragraph_header.find(ideal_json['security']['MainHeader']) != -1:
+        if calculate_similarity(ideal_json['security']['keywords'],
+                                paragraph_header) > 0.9 and not is_there_main_header2:
+            # if paragraph_header.find(ideal_json['security']['MainHeader']) != -1:
             is_there_main_header = True
             is_there_main_header2 = True
             is_main_header = True
 
         if is_there_main_header:
-            # if True:
             ideal_paragraphs = ideal_json['security']['paragraphs']
             flag = False
             for ideal_paragraph in ideal_paragraphs:
@@ -85,18 +85,18 @@ def analysis(paragraphs) -> None:
                     break
 
             if not flag and is_main_header:
-                if main_headers == 0:
-                    obj = {
-                        "text": paragraph_header,
-                        "link": re.sub(r'\s', '', paragraph_header[:15]),
-                        "messages": []
-                    }
-                    st.header(paragraph_header, anchor=re.sub(r'\s', '', paragraph_header[:15]))
-                    if paragraph_text:
-                        st.write(paragraph_text)
-                        obj['messages'].append('Неизвестный текст')
-                    write(paragraph_header, obj['messages'], True, obj['link'])
-                    main_headers += 1
+                # if main_headers == 0:
+                obj = {
+                    "text": paragraph_header,
+                    "link": re.sub(r'\s', '', paragraph_header[:15]),
+                    "messages": []
+                }
+                st.header(paragraph_header, anchor=re.sub(r'\s', '', paragraph_header[:15]))
+                if paragraph_text:
+                    st.write(paragraph_text)
+                    obj['messages'].append('Неизвестный текст')
+                write(paragraph_header, obj['messages'], True, obj['link'])
+                # main_headers += 1
                 is_main_header = False
                 continue
 
