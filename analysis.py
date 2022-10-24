@@ -54,19 +54,20 @@ def analysis(paragraphs) -> None:
         paragraph_header = paragraph['paragraphHeader']['text']
 
         if not is_there_confidentiality:
-            is_there_confidentiality = confidentiality(
-                ideal_json['confidentiality'],
-                paragraph['paragraphHeader']['text'],
-                paragraph_text,
-                list_of_links,
-                -20
-            )
-            if is_there_confidentiality:
+            if calculate_similarity(ideal_json['confidentiality']['keywords'],
+                                    paragraph['paragraphHeader']['text']) > 0.85:
+                print_found_paragraph(
+                    ideal_json['confidentiality'],
+                    paragraph['paragraphHeader']['text'],
+                    paragraph_text,
+                    list_of_links,
+                    -20
+                )
+                is_there_confidentiality = True
                 continue
 
         if calculate_similarity(ideal_json['security']['keywords'],
                                 paragraph_header) > 0.9 and not is_there_main_header2:
-            # if paragraph_header.find(ideal_json['security']['MainHeader']) != -1:
             is_there_main_header = True
             is_there_main_header2 = True
             is_main_header = True
@@ -74,18 +75,25 @@ def analysis(paragraphs) -> None:
         if is_there_main_header:
             ideal_paragraphs = ideal_json['security']['paragraphs']
             flag = False
+            max_similarity = 0
+            current_paragraph = None
             for ideal_paragraph in ideal_paragraphs:
-                flag = confidentiality(ideal_paragraph,
-                                       paragraph_header,
-                                       paragraph_text,
-                                       list_of_links,
-                                       ideal_paragraph['id'])
-                if flag:
-                    list_of_sub_paragraphs.append(ideal_paragraph['id'])
-                    break
+                local_similarity = calculate_similarity(ideal_paragraph['keywords'], paragraph_header)
+                if local_similarity > max_similarity or current_paragraph is None:
+                    current_paragraph = ideal_paragraph
+                    max_similarity = local_similarity
+
+            if max_similarity > 0.85:
+                flag = True
+                print_found_paragraph(current_paragraph, paragraph_header, paragraph_text, list_of_links,
+                                      current_paragraph['id'])
+
+            if flag:
+                list_of_sub_paragraphs.append(current_paragraph['id'])
+                is_main_header = False
+                continue
 
             if not flag and is_main_header:
-                # if main_headers == 0:
                 obj = {
                     "text": paragraph_header,
                     "link": re.sub(r'\s', '', paragraph_header[:15]),
@@ -96,17 +104,17 @@ def analysis(paragraphs) -> None:
                     st.write(paragraph_text)
                     obj['messages'].append('Неизвестный текст')
                 write(paragraph_header, obj['messages'], True, obj['link'])
-                # main_headers += 1
                 is_main_header = False
                 continue
 
-            if flag:
-                is_main_header = False
-                continue
+            # if flag:
+            #     is_main_header = False
+            #     continue
 
             if not flag:
                 list_of_links.append({
                     "text": paragraph_header,
+                    'similarity': f' ({round(max_similarity*100)}% {current_paragraph["header"]})',
                     "link": re.sub(r'\s', '', paragraph_header[:15]),
                     "messages": ["Неизвестный пункт"],
                     "unknown": True
@@ -156,85 +164,84 @@ def analysis(paragraphs) -> None:
 
     for link in list_of_links2:
         link_text = link['text'].replace('\n', '').replace('\r', '')
-        write(link_text, link['messages'], True if link['link'] is not None else False, link['link'])
+        write(link_text, link['messages'],
+              True if link['link'] is not None else False,
+              link['link'],
+              link.get('similarity', None))
 
 
-def confidentiality(etalon: dict, header: str, text: str, list_of_link: [],
-                    paragraph_id=None) -> bool:
-    if calculate_similarity(etalon['keywords'], header) > 0.85:
-        # if header.find(correct_header) != -1:
-        list_of_symbol = ['[', '$', '&',
-                          '+', ':', ';',
-                          '=', '?', '@',
-                          '#', '|', '<',
-                          '>', '.', '^',
-                          '*', '(', ')',
-                          '%', '!', '-', ']']
-        spans_ideal = WhitespaceTokenizer().tokenize(text)
-        spans = WhitespaceTokenizer().tokenize(etalon['text'])
-        i = -1
-        list_of_bad_lines: [str] = []
-        list_of_good_lines: [str] = []
-        diff = difflib.unified_diff(spans, spans_ideal)
-        are_there_errors = False
+def print_found_paragraph(etalon: dict, header: str, text: str, list_of_link: [],
+                          paragraph_id=None) -> None:
+    # if calculate_similarity(etalon['keywords'], header) > 0.85:
+    # if header.find(correct_header) != -1:
+    list_of_symbol = ['[', '$', '&',
+                      '+', ':', ';',
+                      '=', '?', '@',
+                      '#', '|', '<',
+                      '>', '.', '^',
+                      '*', '(', ')',
+                      '%', '!', '-', ']']
+    spans_ideal = WhitespaceTokenizer().tokenize(text)
+    spans = WhitespaceTokenizer().tokenize(etalon['text'])
+    i = -1
+    list_of_bad_lines: [str] = []
+    list_of_good_lines: [str] = []
+    diff = difflib.unified_diff(spans, spans_ideal)
+    are_there_errors = False
 
-        for ind, line in enumerate(diff):
-            if line.startswith('---') or line.startswith('+++'):
-                continue
-            if line.startswith('@@') and line.endswith('@@\n'):
-                i += 1
-                continue
-            if not index_exists(list_of_good_lines, i):
-                list_of_good_lines.append('')
-            if not index_exists(list_of_bad_lines, i):
-                list_of_bad_lines.append('')
+    for ind, line in enumerate(diff):
+        if line.startswith('---') or line.startswith('+++'):
+            continue
+        if line.startswith('@@') and line.endswith('@@\n'):
+            i += 1
+            continue
+        if not index_exists(list_of_good_lines, i):
+            list_of_good_lines.append('')
+        if not index_exists(list_of_bad_lines, i):
+            list_of_bad_lines.append('')
 
-            if line.startswith('-'):
-                are_there_errors = True
-                list_of_good_lines[
-                    i] += f'<span style="background-color:rgb(141, 255, 135);display: inline;"> {line[1:]} </span>'
-                continue
+        if line.startswith('-'):
+            are_there_errors = True
+            list_of_good_lines[
+                i] += f'<span style="background-color:rgb(141, 255, 135);display: inline;"> {line[1:]} </span>'
+            continue
 
-            if line.startswith('+'):
-                are_there_errors = True
-                list_of_bad_lines[i] += ' ' + line[1:]
-                list_of_good_lines[
-                    i] += f'<span style="background-color:rgb(254, 204, 203);display: inline;"> {line[1:]} </span>'
-                continue
+        if line.startswith('+'):
+            are_there_errors = True
+            list_of_bad_lines[i] += ' ' + line[1:]
+            list_of_good_lines[
+                i] += f'<span style="background-color:rgb(254, 204, 203);display: inline;"> {line[1:]} </span>'
+            continue
 
-            list_of_good_lines[i] += line
-            list_of_bad_lines[i] += line
+        list_of_good_lines[i] += line
+        list_of_bad_lines[i] += line
 
-        for index, line in enumerate(list_of_good_lines):
-            line2 = list_of_bad_lines[index].strip()
-            for symbol in list_of_symbol:
-                line2 = line2.replace(symbol, f'\\{symbol}')
+    for index, line in enumerate(list_of_good_lines):
+        line2 = list_of_bad_lines[index].strip()
+        for symbol in list_of_symbol:
+            line2 = line2.replace(symbol, f'\\{symbol}')
 
-            line2 = re.sub(r'\s+', '\\\s+', line2)
-            re_compile = re.compile(line2)
-            text = re_compile.sub(line, text)
+        line2 = re.sub(r'\s+', '\\\s+', line2)
+        re_compile = re.compile(line2)
+        text = re_compile.sub(line, text)
 
-        obj = {
-            "id": paragraph_id,
-            "text": header,
-            "link": re.sub(r'\s', '', header[:15]),
-            "messages": []
-        }
+    obj = {
+        "id": paragraph_id,
+        "text": header,
+        "link": re.sub(r'\s', '', header[:15]),
+        "messages": []
+    }
 
-        if are_there_errors:
-            obj['messages'].append('Ошибки')
-        else:
-            obj['messages'].append("Найден, ошибок нет")
-        if paragraph_id == -20:
-            write(header, obj['messages'], True, re.sub(r'\s', '', header[:15]))
-        else:
-            list_of_link.append(obj)
-        st.header(header, re.sub(r'\s', '', header[:15]))
-        st.markdown(text, unsafe_allow_html=True)
-
-        return True
+    if are_there_errors:
+        obj['messages'].append('Ошибки')
     else:
-        return False
+        obj['messages'].append("Найден, ошибок нет")
+    if paragraph_id == -20:
+        write(header, obj['messages'], True, re.sub(r'\s', '', header[:15]))
+    else:
+        list_of_link.append(obj)
+    st.header(header, re.sub(r'\s', '', header[:15]))
+    st.markdown(text, unsafe_allow_html=True)
 
 
 def index_exists(list_of, index):
@@ -245,9 +252,11 @@ def index_exists(list_of, index):
         return False
 
 
-def write(text, messages, is_link=False, link=None):
+def write(text, messages, is_link=False, link=None, similarity=None):
     link_text = text.replace('\n', '').replace('\r', '')
     link_text = re.sub(r"[\d\.]{1,4}", "", link_text)
+    if similarity:
+        link_text += similarity
     if is_link:
         st.sidebar.markdown(f'[{link_text}](#{link})')
     else:
