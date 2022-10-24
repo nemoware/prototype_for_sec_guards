@@ -49,15 +49,42 @@ def get_json_from_parser(doc, filename):
 
 st.set_page_config(layout="wide")
 
-st.markdown(f'''
+st.markdown('''
     <style>
-        header[data-testid="stHeader"] {{left:98%;}}
+        header[data-testid="stHeader"] {left:98%;}
     </style>
 ''', unsafe_allow_html=True)
 
-st.markdown(f'''
+st.markdown('''
     <style>
-        div[data-testid="stMarkdownContainer"] > p {{margin-bottom: 5px;}}
+        div[data-testid="stMarkdownContainer"] > p {margin-bottom: 5px;}
+    </style>
+''', unsafe_allow_html=True)
+
+st.markdown('''
+    <style>
+        .tooltip {
+            position:relative;
+        }
+        .tooltip:before {
+            content: attr(data-text); /* here's the magic */
+            position:absolute;
+          
+            bottom:100%;
+            margin-left:15px;
+            
+            width:200px;
+            padding:10px;
+            border-radius:10px;
+            background:#fff;
+            color: #32333e;
+            text-align:center;
+            
+            display:none;
+        }
+        .tooltip:hover:before {
+            display:block;
+        }
     </style>
 ''', unsafe_allow_html=True)
 

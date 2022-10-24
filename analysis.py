@@ -8,9 +8,7 @@ import tensorflow_hub as hub
 import tensorflow_text as text
 from nltk import WhitespaceTokenizer
 
-with open('./ideal.json', encoding='utf-8') as f:
-    ideal_json = json.load(f)
-    embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-multilingual-large/3")
+embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-multilingual-large/3")
 
 
 def get_clean_spans(text: str) -> [str]:
@@ -23,7 +21,7 @@ def get_clean_spans(text: str) -> [str]:
 
 
 def calculate_similarity(keywords: [str], text: str):
-    normalized_header = re.sub(r'^[\d,.]+', '', text)
+    normalized_header = re.sub(r'^[\d,.]+', '', text.lower())
     clean_spans = get_clean_spans(normalized_header)
     if len(clean_spans) > 7:  # в эталоне только короткие заголовки
         return 0
@@ -37,8 +35,10 @@ def calculate_similarity(keywords: [str], text: str):
 
 
 def analysis(paragraphs) -> None:
+    with open('./ideal.json', encoding='utf-8') as f:
+        ideal_json = json.load(f)
     confidentiality_header = ideal_json['confidentiality']['header']
-    confidentiality_text = ideal_json['confidentiality']['text']
+    # confidentiality_text = ideal_json['confidentiality']['text']
 
     is_there_confidentiality: bool = False
     is_there_main_header: bool = False
@@ -78,16 +78,23 @@ def analysis(paragraphs) -> None:
             max_similarity = 0
             current_paragraph = None
             for ideal_paragraph in ideal_paragraphs:
+                if current_paragraph is None:
+                    current_paragraph = ideal_paragraph
+                if ideal_paragraph['id'] in map(lambda x: x.get('id', -100), list_of_links):
+                    continue
                 local_similarity = calculate_similarity(ideal_paragraph['keywords'], paragraph_header)
-                if local_similarity > max_similarity or current_paragraph is None:
+                if local_similarity > max_similarity:
                     current_paragraph = ideal_paragraph
                     max_similarity = local_similarity
 
             if max_similarity > 0.85:
                 flag = True
-                print_found_paragraph(current_paragraph, paragraph_header, paragraph_text, list_of_links,
+                print_found_paragraph(current_paragraph,
+                                      paragraph_header,
+                                      paragraph_text,
+                                      list_of_links,
                                       current_paragraph['id'])
-
+                list_of_links[-1]['similarity'] = f' ({round(max_similarity*100)}% {current_paragraph["header"]})'
             if flag:
                 list_of_sub_paragraphs.append(current_paragraph['id'])
                 is_main_header = False
@@ -106,10 +113,6 @@ def analysis(paragraphs) -> None:
                 write(paragraph_header, obj['messages'], True, obj['link'])
                 is_main_header = False
                 continue
-
-            # if flag:
-            #     is_main_header = False
-            #     continue
 
             if not flag:
                 list_of_links.append({
@@ -255,17 +258,35 @@ def index_exists(list_of, index):
 def write(text, messages, is_link=False, link=None, similarity=None):
     link_text = text.replace('\n', '').replace('\r', '')
     link_text = re.sub(r"[\d\.]{1,4}", "", link_text)
-    if similarity:
-        link_text += similarity
+    # if similarity:
+    #     link_text += similarity
     if is_link:
-        st.sidebar.markdown(f'[{link_text}](#{link})')
+        # st.sidebar.markdown(f'[{link_text}](#{link})')
+        if similarity:
+            st.sidebar.markdown(f'''
+                <p style="margin-bottom: 5px;">
+                    <a
+                        data-text="{similarity}" 
+                        class="tooltip"
+                        href="#{link}">{link_text}
+                    </a>
+                </p>
+                ''', unsafe_allow_html=True)
+        else:
+            st.sidebar.markdown(f'''
+                <p>
+                    <a href="#{link}">{link_text}
+                    </a>
+                </p>
+                ''', unsafe_allow_html=True)
     else:
         st.sidebar.write(text)
-    result_str = '<div style="display: flex;gap: 10px;">'
-    for msg in messages:
-        result_str += get_style(msg)
-    result_str += '</div>'
-    st.sidebar.markdown(result_str, unsafe_allow_html=True)
+    if len(messages) > 0:
+        result_str = '<div style="display: flex;gap: 10px;">'
+        for msg in messages:
+            result_str += get_style(msg)
+        result_str += '</div>'
+        st.sidebar.markdown(result_str, unsafe_allow_html=True)
 
 
 def get_style(text: str):
